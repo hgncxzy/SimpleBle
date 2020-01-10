@@ -42,6 +42,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.xzy.ble.simplebledemo.bluetooth.device.BleDevice.MAC;
+
 /**
  * 抽象的硬件，提取公共部分
  *
@@ -68,7 +70,7 @@ public abstract class BaseBleDevice {
     public static String retryConnect = "com.xzy.ble.action.connect.retry.connect";
 
     /**
-     *读写
+     * 读写
      */
     public static String writeSuccessAction = "com.xzy.ble.action.write_success";
     public static String writeFailedAction = "com.xzy.ble.action.write_failed";
@@ -126,14 +128,17 @@ public abstract class BaseBleDevice {
                 mConnectionState = STATE_CONNECTED;
                 sendBroadcast(connectSuccess, "连接成功");
                 mBluetoothGatt.discoverServices();
-
-
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED || status != BluetoothGatt.GATT_SUCCESS) {
                 if (connectChangedListener != null) {
                     connectChangedListener.onDisconnected();
                     sendBroadcast(connectFail, "连接失败");
                 }
                 mConnectionState = STATE_DISCONNECTED;
+                // 重置
+                gatt.close();
+                close();
+                // 重连操作 todo
+                connect(MAC);
             }
 
             Log.d(TAG, "连接状态:" + mConnectionState);
@@ -169,14 +174,9 @@ public abstract class BaseBleDevice {
         }
 
         @Override
-        public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-            Log.d(TAG, "onCharacteristicRead: status = " + status);
-        }
-
-        @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             Log.d(TAG, "onCharacteristicChanged: 接收数据成功,value =" + HexUtil.bytesToHexString(characteristic.getValue()));
-//            parseData(characteristic);
+            // parseData(characteristic);
             sendBroadcast(notifyAction, HexUtil.bytesToHexString(characteristic.getValue()));
         }
 
@@ -239,8 +239,6 @@ public abstract class BaseBleDevice {
             Log.w(TAG, " --------- Device not found.  Unable to connect. --------- ");
             return;
         }
-
-
         mBluetoothGatt = device.connectGatt(context, true, mGattCallback);
         Log.d(TAG, " --------- Trying to create a new connection. --------- ");
         mConnectionState = STATE_CONNECTING;
@@ -268,6 +266,7 @@ public abstract class BaseBleDevice {
         if (mBluetoothGatt == null) {
             return;
         }
+        mBluetoothGatt.disconnect();
         mBluetoothGatt.close();
         mBluetoothGatt = null;
     }
