@@ -52,6 +52,24 @@ import java.util.UUID;
 public abstract class BaseBleDevice {
     private final static String TAG = BaseBleDevice.class.getSimpleName();
 
+    /**
+     * 扫描结果广播
+     */
+    public static String scanResultNotify = "com.xzy.ble.action.scan.result.notify";
+    public static String scanFinish = "com.xzy.ble.action.scan.result.finish";
+
+    /**
+     * 连接广播
+     */
+    public static String connectSuccess = "com.xzy.ble.action.connect.success";
+    public static String connectFail = "com.xzy.ble.action.connect.fail";
+    public static String connectTimeout = "com.xzy.ble.action.connect.timeout";
+    public static String disconnect = "com.xzy.ble.action.connect.disconnect";
+    public static String retryConnect = "com.xzy.ble.action.connect.retry.connect";
+
+    /**
+     *读写
+     */
     public static String writeSuccessAction = "com.xzy.ble.action.write_success";
     public static String writeFailedAction = "com.xzy.ble.action.write_failed";
     public static String notifyAction = "com.xzy.ble.action.notify";
@@ -106,14 +124,18 @@ public abstract class BaseBleDevice {
                     connectChangedListener.onConnected();
                 }
                 mConnectionState = STATE_CONNECTED;
+                sendBroadcast(connectSuccess, "连接成功");
                 mBluetoothGatt.discoverServices();
+
 
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 if (connectChangedListener != null) {
                     connectChangedListener.onDisconnected();
+                    sendBroadcast(connectFail, "连接失败");
                 }
                 mConnectionState = STATE_DISCONNECTED;
             }
+
             Log.d(TAG, "连接状态:" + mConnectionState);
         }
 
@@ -154,8 +176,8 @@ public abstract class BaseBleDevice {
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             Log.d(TAG, "onCharacteristicChanged: 接收数据成功,value =" + HexUtil.bytesToHexString(characteristic.getValue()));
-            parseData(characteristic);
-            sendBroadcast(notifyAction);
+//            parseData(characteristic);
+            sendBroadcast(notifyAction, HexUtil.bytesToHexString(characteristic.getValue()));
         }
 
         @Override
@@ -168,7 +190,7 @@ public abstract class BaseBleDevice {
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             super.onCharacteristicWrite(gatt, characteristic, status);
             Log.d(TAG, "onCharacteristicWrite: " + "发送数据成功，value = " + HexUtil.bytesToHexString(characteristic.getValue()));
-            sendBroadcast(writeSuccessAction);
+            sendBroadcast(writeSuccessAction, HexUtil.bytesToHexString(characteristic.getValue()));
         }
     };
 
@@ -178,7 +200,7 @@ public abstract class BaseBleDevice {
      *
      * @param characteristic BluetoothGattCharacteristic
      */
-    public abstract void parseData(BluetoothGattCharacteristic characteristic);
+    //public abstract void parseData(BluetoothGattCharacteristic characteristic);
 
 
     /**
@@ -346,7 +368,7 @@ public abstract class BaseBleDevice {
                     writeCallback.onSuccess();
                 }
             } else {
-                sendBroadcast(writeFailedAction);
+                sendBroadcast(writeFailedAction, "发送失败");
             }
         }
     }
@@ -368,8 +390,9 @@ public abstract class BaseBleDevice {
         this.connectChangedListener = connectChangedListener;
     }
 
-    private void sendBroadcast(String action) {
+    private void sendBroadcast(String action, String data) {
         Intent intent = new Intent(action);
+        intent.putExtra("data", data);
         context.sendBroadcast(intent);
     }
 }

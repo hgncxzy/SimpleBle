@@ -3,8 +3,12 @@ package com.xzy.ble.simplebledemo;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
+
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -18,6 +22,7 @@ import com.xzy.ble.simplebledemo.bluetooth.callback.OnDeviceConnectChangedListen
 import com.xzy.ble.simplebledemo.bluetooth.callback.OnScanCallback;
 import com.xzy.ble.simplebledemo.bluetooth.callback.OnWriteCallback;
 import com.xzy.ble.simplebledemo.bluetooth.device.BleDevice;
+import com.xzy.ble.simplebledemo.bluetooth.receiver.MyBroadcastReceiver;
 import com.xzy.ble.simplebledemo.bluetooth.utils.Permission;
 
 import java.util.ArrayList;
@@ -27,28 +32,20 @@ import static com.xzy.ble.simplebledemo.bluetooth.device.BleDevice.MAC;
 /**
  * @author xzy
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements MyBroadcastReceiver.Update {
     private static final String TAG = "MainActivity";
-
     private TextView mConnectionState;
     private TextView scanResult;
     private TextView mReceiveData;
-
     private EditText sendCommand;
-    private BleDevice bluetoothLeDeviceA;
-
+    private MyBroadcastReceiver myBroadcastReceiver = new MyBroadcastReceiver(this,this);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        bluetoothLeDeviceA = new BleDevice(this, new BleDevice.Update() {
-            @Override
-            public void update(String hexStr) {
-                mReceiveData.setText(hexStr);
-            }
-        });
-        bluetoothLeDeviceA.setConnectChangedListener(new OnDeviceConnectChangedListener() {
+        myBroadcastReceiver.registerReceiver(myBroadcastReceiver);
+        BleDevice.getInstance(getApplicationContext()).setConnectChangedListener(new OnDeviceConnectChangedListener() {
             @Override
             public void onConnected() {
                 runOnUiThread(new Runnable() {
@@ -72,15 +69,19 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        BluetoothAdapter mBluetoothAdapter = bluetoothLeDeviceA.isDeviceSupport();
+        BluetoothAdapter mBluetoothAdapter = BleDevice.getInstance(getApplicationContext()).isDeviceSupport();
         if (mBluetoothAdapter == null) {
             finish();
             return;
         }
 
         findViewById(R.id.scan).setOnClickListener(new View.OnClickListener() {
+            @SuppressLint("SetTextI18n")
             @Override
             public void onClick(View v) {
+                // 扫描前先断开连接
+                BleDevice.getInstance(getApplicationContext()).disconnect();
+                mConnectionState.setText("onDisconnected");
                 scanLeDevice(true);
             }
         });
@@ -96,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
                 mReceiveData.setText("");
                 String sendContent = sendCommand.getText().toString();
                 if (!TextUtils.isEmpty(sendContent)) {
-                    bluetoothLeDeviceA.writeBuffer(sendContent, new OnWriteCallback() {
+                    BleDevice.getInstance(getApplicationContext()).writeBuffer(sendContent, new OnWriteCallback() {
                         @Override
                         public void onSuccess() {
                             Log.e(TAG, "write data success");
@@ -120,7 +121,6 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
-
     }
 
     @Override
@@ -133,13 +133,13 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        scanLeDevice(false);
+        //scanLeDevice(false);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        //bluetoothLeDeviceA.close();
+        unregisterReceiver(myBroadcastReceiver);
     }
 
     ArrayList<BluetoothDevice> devices = new ArrayList<>();
@@ -152,11 +152,7 @@ public class MainActivity extends AppCompatActivity {
 
     @SuppressLint("SetTextI18n")
     private void startScan(boolean enable) {
-        // 扫描前先断开连接
-        bluetoothLeDeviceA.disconnect();
-        mConnectionState.setText("onDisconnected");
-
-        bluetoothLeDeviceA.scanBleDevice(enable, new OnScanCallback() {
+        BleDevice.getInstance(getApplicationContext()).scanBleDevice(enable, new OnScanCallback() {
             @Override
             public void onFinish() {
                 //这里可以用ListView将扫描到的设备展示出来，然后选择某一个进行连接
@@ -171,7 +167,7 @@ public class MainActivity extends AppCompatActivity {
                     stringBuilder.append("\n");
                 }
                 scanResult.setText(stringBuilder.toString());
-                bluetoothLeDeviceA.connect(MAC);
+                BleDevice.getInstance(getApplicationContext()).connect(MAC);
             }
 
             @Override
@@ -186,5 +182,10 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    @Override
+    public void update(String hexStr) {
+        mReceiveData.setText(hexStr);
     }
 }

@@ -1,5 +1,6 @@
 package com.xzy.ble.simplebledemo.bluetooth.device;
 
+import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.Context;
 import android.util.Log;
@@ -17,7 +18,7 @@ import java.util.UUID;
  */
 public class BleDevice extends BaseBleDevice {
     private static final String TAG = "BleDevice";
-    private Update mUpdate;
+
     /**
      * 根据具体硬件进行设置
      **/
@@ -26,25 +27,21 @@ public class BleDevice extends BaseBleDevice {
     private static final UUID DEVICE_WRITE_UUID = UUID.fromString("00001001-0000-1000-8000-00805f9b34fb");
     private static final UUID DEVICE_NOTIFY_UUID = UUID.fromString("00001002-0000-1000-8000-00805f9b34fb");
 
-    public BleDevice(Context context, Update update) {
+
+    @SuppressLint("StaticFieldLeak")
+    private static BleDevice mBleDevice;
+
+    private BleDevice(Context context) {
         super(context);
-        mUpdate = update;
         serviceUuid = DEVICE_SERVICE_UUID;
         writeUuid = DEVICE_WRITE_UUID;
         notifyUuid = DEVICE_NOTIFY_UUID;
     }
 
-    @Override
-    public void parseData(BluetoothGattCharacteristic characteristic) {
-        String hexStr = HexUtil.bytesToHexString(characteristic.getValue());
-        Log.e(TAG, "待解析数据: " + hexStr);
-        if (mUpdate != null) {
-            mUpdate.update(hexStr);
+    public static BleDevice getInstance(Context context){
+        if(mBleDevice == null){
+            mBleDevice = new BleDevice(context);
         }
+        return mBleDevice;
     }
-
-    public interface Update {
-        void update(String hexStr);
-    }
-
 }
